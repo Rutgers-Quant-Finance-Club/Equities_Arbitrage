@@ -1,5 +1,8 @@
 {
     "cSpell.words": [
         "Eigenportfolio"
-    ]
+    ],
+        "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
 }
