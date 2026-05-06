@@ -1,66 +1,100 @@
 # Statistical Arbitrage in US Equities
 
-Implementation of Avellaneda & Lee (2010), *Statistical arbitrage in the US equities market*, Quantitative Finance, 10:7, 761-782.
+Implementation and out-of-sample evaluation of Avellaneda & Lee (2010), *Statistical arbitrage in the US equities market*, Quantitative Finance, 10:7, 761-782.
 
 ## Overview
 
-Mean-reversion strategy that decomposes stock returns into systematic and idiosyncratic components using PCA. Idiosyncratic residuals are modeled as Ornstein-Uhlenbeck processes. Stocks whose residuals deviate significantly from equilibrium are traded as contrarian bets, expecting reversion.
+Mean-reversion strategy that decomposes stock returns into systematic and idiosyncratic components using PCA. Idiosyncratic residuals are modeled as Ornstein-Uhlenbeck processes. Stocks whose residuals deviate significantly from equilibrium are traded as contrarian bets, expecting reversion. Portfolio is hedged against SPY to maintain market neutrality.
 
-## Pipeline
+## Back Test Pipeline
 
-1. **PCA Factor Extraction** — Estimate correlation matrix on trailing 252 days, extract eigenportfolios as risk factors
-2. **Factor Regression** — Regress each stock's returns on factor returns over trailing 60 days, extract idiosyncratic residuals
-3. **OU Estimation** — Cumulate residuals, fit AR(1) to estimate mean-reversion speed, equilibrium level, and equilibrium volatility
-4. **S-score** — Normalize distance from equilibrium, centre cross-sectionally to remove estimation bias
-5. **Position Management** — Open when |s| exceeds entry threshold, close when |s| falls below exit threshold, bang-bang sizing
-6. **PNL** — Daily mark-to-market on real returns with slippage
+1. **PCA Factor Extraction** — Estimate correlation matrix on trailing 252 days, dynamically select eigenportfolios to explain 55% of variance (Section 2.1, 5.4)
+2. **Factor Regression** — Regress each stock's returns on factor returns over trailing 60 days, extract idiosyncratic residuals (eq. 10)
+3. **OU Estimation** — Cumulate residuals, fit AR(1) to estimate mean-reversion speed, equilibrium level, and equilibrium volatility (Appendix A)
+4. **S-score** — Normalize distance from equilibrium, centre cross-sectionally to remove estimation bias (eq. 15, 18, A2)
+5. **SPY Hedge** — Compute each stock's beta against SPY, offset aggregate portfolio beta with SPY position
+6. **Position Management** — Open when |s| exceeds entry threshold, close when |s| falls below exit threshold, bang-bang sizing (eq. 16)
+7. **PNL** — Daily mark-to-market on real returns with slippage
+
+## Results
+
+### 2013–2016 (S&P 500)
+
+| Metric | Value |
+|--------|-------|
+| Sharpe ratio | 0.62 |
+| Annual return | 0.66% |
+| Annual volatility | 1.07% |
+| Max drawdown | -1.18% |
+| Avg longs / shorts | 30 / 19 |
+| Cost drag | 50% |
+| Avg portfolio beta | 6.57 |
+| Avg factors selected | 11.2 |
+
+Note: Results use yfinance data with ~30% of tickers lost to delisting, resulting in survivorship bias and a smaller trading universe.
+
+### Comparison to Original Paper
+
+| Period | Sharpe | Notes |
+|--------|--------|-------|
+| 1997–2007 (paper) | 1.44 | 15 PCA factors, 5 bps slippage |
+| 2003–2007 (paper) | 0.90 | Declining performance noted by authors |
+| 2013–2016 (this) | 0.62 | Dynamic factors (avg 11.2), 5 bps slippage, SPY hedged |
+
+## Key Findings
+
+- **Strategy degradation** Consistent with the paper's own observation of declining Sharpe ratios over time.
+- **Transaction Costs** Gross PNL is positive but cost drag of 50% consumes half of returns.
+- **Weak Stationarity** ADF testing shows only ~12% of stocks have stationary residuals on 60-day windows. The OU model assumption holds for a minority of the universe.
+- **SPY hedging matters** Without hedging, portfolio returns are contaminated by market exposure. Adding SPY beta-neutrality is essential for isolating idiosyncratic returns.
+- **Dynamic factor selection.** Targeting 55% explained variance averaged 11.2 factors, consistent with the paper's finding that 10–15 factors are needed to explain US equity returns.
 
 ## Project Structure
 
 ```
+├── data/                      # Generated CSVs (not tracked)
 ├── notebooks/
-│   ├── data_pipeline.ipynb    # Download and clean price/volume data
-│   └── backtest.ipynb         # Run backtest and analyze results
+│   ├── data.ipynb    # Download and clean price/volume data
+│   └── pca_strategy.ipynb         # Run backtest and analyze results
 ├── src/
 │   ├── __init__.py
+│   ├── backtest.py            # Main backtest loop with SPY hedge
 │   ├── constants.py           # All strategy parameters
 │   ├── data.py                # Data loading and volume adjustment
+│   ├── diagnostics.py         # Performance reporting and visualization
 │   ├── factors.py             # PCA and factor regression
 │   ├── signals.py             # S-score computation and position updates
-│   ├── backtest.py            # Main backtest loop
-│   └── diagnostics.py         # Performance reporting and visualization
-├── data/                      # Generated CSVs (not tracked)
+│   └── stationary_test.py     # ADF stationarity testing
 ├── .gitignore
 └── README.md
 ```
 
 ## Data
 
-- **Universe:** S&P 500 constituents as of January 2018
-- **Period:** 2018–2023
+- **Universe:** S&P 500 constituents sourced from historical Wikipedia snapshot (January 2013)
+- **Period:** 2013–2016
 - **Source:** Yahoo Finance via yfinance
-- **Filtering:** Stocks with at least 95% data availability, forward-filled gaps
+- **Filtering:** Stocks with ≥95% data availability, forward-filled gaps, extreme returns (>100%) removed
+- **SPY:** Included for beta-neutral hedging
 
 Data files are generated by `notebooks/data_pipeline.ipynb` and saved to `data/`. They are not tracked in git.
 
-## Usage
-
-1. Run `notebooks/data_pipeline.ipynb` to download and save price, volume, and metadata CSVs.
-2. Run `notebooks/backtest.ipynb` to execute the strategy and view results.
-
-## Key Parameters
+## Parameters
 
 | Parameter | Value | Reference |
 |-----------|-------|-----------|
-| PCA factors | 5 | 
-| PCA window | 252 days | 
-| Estimation window | 75 days | 
-| Entry threshold | 1.25 | 
-| Long exit threshold | 0.65 | 
-| Short exit threshold | 0.80 | 
-| Slippage | 1 bps/side | 
-| Leverage | 2+2 | 
+| PCA factors | Dynamic (avg 11.2) | Section 5.4 |
+| Target variance | 55% | Section 5.4 |
+| PCA window | 252 days | Section 2.1 |
+| Estimation window | 60 days | Section 4 |
+| Entry threshold | 1.90 | eq. 16 |
+| Long exit threshold | 0.25 | eq. 16 |
+| Short exit threshold | 0.85 | eq. 16 |
+| Volume window | 10 days | Section 6 |
+| Slippage | 5 bps/side | Section 5 |
+| Leverage | 2+2 | Section 5 |
+| Max slope (OU filter) | 0.967 | Section 4 |
 
 ## References
 
-Avellaneda, M. & Lee, J.-H. (2010). Statistical arbitrage in the US equities market. *Quantitative Finance*, 10:7, 761-782. [DOI: 10.1080/14697680903124632](https://doi.org/10.1080/14697680903124632)
+- Avellaneda, M. & Lee, J.-H. (2010). Statistical arbitrage in the US equities market. *Quantitative Finance*, 10:7, 761-782. [DOI: 10.1080/14697680903124632](https://doi.org/10.1080/14697680903124632)
