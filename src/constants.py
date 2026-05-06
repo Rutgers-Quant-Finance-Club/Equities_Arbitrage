@@ -8,15 +8,15 @@ VOLUME_WINDOW = 10
 PCA_WINDOW = 252
 
 # Trailing window for factor regression and OU estimation (Section 4)
-ESTIMATION_WINDOW = 75
+ESTIMATION_WINDOW = 60
 
 # S-score thresholds for entry and exit (eq. 16)
 OPEN_THRESHOLD = 1.25
-CLOSE_LONG_THRESHOLD = 0.65
-CLOSE_SHORT_THRESHOLD = 0.8
+CLOSE_LONG_THRESHOLD = 0.5
+CLOSE_SHORT_THRESHOLD = 0.75
 
-# Slippage per side, 2 bps round trip (Section 5)
-SLIPPAGE_PER_TRADE = 0.0001
+# Slippage per side, 10 bps round trip (Section 5)
+SLIPPAGE_PER_TRADE = 0.0005
 
 # Dollars long and short per dollar of equity (Section 5)
 LEVERAGE = 2

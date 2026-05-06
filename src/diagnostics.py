@@ -12,6 +12,7 @@ def print_diagnostics(results: pd.DataFrame):
     total_return = results["equity"].iloc[-1] / results["equity"].iloc[0] - 1
     annual_return = (1 + total_return) ** (252 / total_days) - 1
     annual_vol = results["daily_returns"].std() * np.sqrt(252)
+    avg_beta = results["portfolio_beta"].mean()
     sharpe = annual_return / annual_vol
     max_dd = (results["equity"] / results["equity"].cummax() - 1).min()
     total_cost = results["slippage_cost"].sum()
@@ -25,13 +26,14 @@ def print_diagnostics(results: pd.DataFrame):
     print(f"Annual return:   {annual_return:.2%}")
     print(f"Annual vol:      {annual_vol:.2%}")
     print(f"Sharpe ratio:    {sharpe:.2f}")
+    print(f"Avg portfolio beta: {avg_beta:.4f}")
     print(f"Max drawdown:    {max_dd:.2%}")
     print(f"Avg longs:       {avg_long:.0f}")
     print(f"Avg shorts:      {avg_short:.0f}")
     print(f"Gross PNL:       {total_gross_pnl:.2f}")
     print(f"Total costs:     {total_cost:.2f}")
     print(f"Cost drag:       {cost_drag:.2%}")
-    print(f"Number of Factors:       {constants.N_FACTORS}")
+    print(f"Number of Factors:{constants.N_FACTORS}")
 
 
 def graph_weights(weights: np.ndarray, tickers: np.ndarray, factor_num: int):

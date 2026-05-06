@@ -20,7 +20,12 @@ def load_data():
         "../data/raw/stock_meta.csv",
         index_col=0,
     )
-    return stock_returns, stock_volume, stock_meta
+    spy_returns = pd.read_csv(
+        "../data/raw/spy_returns.csv",
+        index_col=0,
+        parse_dates=True,
+    ).squeeze()
+    return stock_returns, stock_volume, stock_meta, spy_returns
 
 
 def adjust_for_volume(
