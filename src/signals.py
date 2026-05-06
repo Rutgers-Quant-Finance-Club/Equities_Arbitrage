@@ -48,7 +48,7 @@ def compute_s_scores(residuals: np.ndarray) -> np.ndarray:
     equilibrium_std = np.sqrt(var_ar_resids / (1 - slope**2))  # (N,)
 
     # slope <= 0 (Random Walk/ Explosive), kappa > 8.4 == slope < 0.967
-    invalid = (slope <= 0) | (slope >= 0.967)
+    invalid = (slope <= 0) | (slope >= constants.MAX_SLOPE)
     equilibriums[invalid] = np.nan
     equilibrium_std[invalid] = np.nan
 
@@ -60,7 +60,7 @@ def compute_s_scores(residuals: np.ndarray) -> np.ndarray:
 
 
 def update_positions(
-    s_scores: np.ndarray, cur_pos: np.ndarray, equity: float
+    s_scores: np.ndarray, valid: np.ndarray, cur_pos: np.ndarray, equity: float
 ) -> np.ndarray:
     """
     Determine tomorrow's positions from today's s-scores and current holdings.
@@ -93,7 +93,6 @@ def update_positions(
     flat = cur_pos == 0
     long = cur_pos > 0
     short = cur_pos < 0
-    valid = ~np.isnan(s_scores)
 
     # Open Long Position
     updated_pos[flat & valid & (s_scores < -constants.OPEN_THRESHOLD)] = allocation

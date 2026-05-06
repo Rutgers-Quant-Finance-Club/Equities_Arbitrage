@@ -2,52 +2,62 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-from src import constants
-
 
 def run_pca(
-    raw_returns: np.ndarray, n_factors: int = None
-) -> tuple[np.ndarray, np.ndarray, PCA]:
+    raw_returns: np.ndarray,
+    max_factors: int = 25,
+    target_var=0.55,
+) -> tuple[np.ndarray, np.ndarray, PCA, int]:
     """
-    Standardize returns and extract PCA factors.
+    Standardize returns and extract PCA factors with dynamic factor selection.
+
+    Fits PCA with max_factors components, then selects the minimum number
+    needed to explain target_var of total variance (Section 5.4).
 
     Parameters
     ----------
-    returns : shape (M, N)
-        Raw returns for N stocks over M days
-    n_factors : int
-        Number of principal components to extract
+    raw_returns : shape (M, N)
+        Raw simple returns for N stocks over M days.
+    max_factors : int
+        Maximum number of principal components to fit.
+    target_var : float
+        Target cumulative explained variance ratio (e.g. 0.55 = 55%).
 
     Returns
     -------
-    factors_returns : np.ndarray, shape (M, n_factors)
-        Return F (F_{ij} is factor i's returns on day j)
+    factor_returns : np.ndarray, shape (M, n_factors)
+        Eigenportfolio returns (eq. 9).
     weights : np.ndarray, shape (N, n_factors)
-        Return Q (Q_{ij} is factor i's jth stock value)
-    pca : fitted PCA object
-        Kept so we can transform new data later
+        Eigenportfolio weights per stock.
+    pca : PCA
+        Fitted PCA object for diagnostics.
+    n_factors : int
+        Number of factors selected to meet target_var.
     """
-    if n_factors is None:
-        n_factors = constants.N_FACTORS
-
     # Step 1: Standardize returns
     scaler = StandardScaler()
     scaled_returns = scaler.fit_transform(raw_returns)  # Shape (M, N)
 
     # Step 2: Run PCA
-    pca = PCA(n_components=n_factors)
+    pca = PCA(n_components=max_factors)
     pca.fit(scaled_returns)
 
-    # Step 3: Scale components by volatility (eq. 8)
+    # Step 3: Choose # of factors to model target variance
+    total_var = np.cumsum(pca.explained_variance_ratio_)
+    n_factors = np.searchsorted(total_var, target_var) + 1
+
+    # Step 4: Scale components by volatility (eq. 8)
     returns_std = scaler.scale_
 
-    # Step 4: Compute weights for each stock for each eigenvector
-    weights = pca.components_.T / returns_std.reshape(-1, 1)  # Shape (N, n_factors)
+    # Step 5: Compute weights for each stock for each eigenvector
+    weights = pca.components_[:n_factors].T / returns_std.reshape(
+        -1, 1
+    )  # Shape (N, n_factors)
 
-    # Step 5: Compute Eigenportfolio Returns (eq. 9)
+    # Step 6: Compute Eigenportfolio Returns (eq. 9)
     factor_returns = raw_returns @ weights  # Shape (M, n_factors)
 
-    return factor_returns, weights, pca
+    return factor_returns, weights, pca, n_factors
 
 
 def fit_factors(

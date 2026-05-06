@@ -4,11 +4,10 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 
-from src import constants
-
 
 def print_diagnostics(results: pd.DataFrame):
     total_days = len(results)
+    avg_factors = results["n_factors"].mean()
     total_return = results["equity"].iloc[-1] / results["equity"].iloc[0] - 1
     annual_return = (1 + total_return) ** (252 / total_days) - 1
     annual_vol = results["daily_returns"].std() * np.sqrt(252)
@@ -33,7 +32,7 @@ def print_diagnostics(results: pd.DataFrame):
     print(f"Gross PNL:       {total_gross_pnl:.2f}")
     print(f"Total costs:     {total_cost:.2f}")
     print(f"Cost drag:       {cost_drag:.2%}")
-    print(f"Number of Factors:{constants.N_FACTORS}")
+    print(f"Avg factors:     {avg_factors:.1f}")
 
 
 def graph_weights(weights: np.ndarray, tickers: np.ndarray, factor_num: int):

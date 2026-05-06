@@ -47,20 +47,20 @@ def run_backtest(
 
         # Fetch windows of SPY and stock returns
         spy_window = spy_returns.values[t - constants.ESTIMATION_WINDOW : t]
-        stock_window = stock_returns.values[t - constants.ESTIMATION_WINDOW : t]
+        stock_window = adj_returns[t - constants.ESTIMATION_WINDOW : t]
         stock_pca_window = adj_returns[t - constants.PCA_WINDOW : t]
 
         # SPY Hedge
         spy_cov = (stock_window * spy_window.reshape(-1, 1)).mean(
             axis=0
         ) - spy_window.mean() * stock_window.mean(axis=0)
-        spy_betas = spy_cov / np.var(spy_window)
+        spy_betas = spy_cov / np.var(spy_window, ddof=1)
         portfolio_beta = positions @ spy_betas
         spy_pnl = portfolio_beta * spy_returns.values[t]
         pnl -= spy_pnl
 
         # Run PCA
-        factor_returns, _, _ = run_pca(stock_pca_window)
+        factor_returns, _, _, n_factors = run_pca(stock_pca_window)
 
         # Fetch stock and factor return windows
         returns_window = stock_pca_window[-constants.ESTIMATION_WINDOW :]
@@ -74,9 +74,10 @@ def run_backtest(
 
         # Computing s-scores
         s_scores = compute_s_scores(residuals)
+        valid = ~np.isnan(s_scores)
 
         # Make trades
-        new_positions = update_positions(s_scores, positions, equity)
+        new_positions = update_positions(s_scores, valid, positions, equity)
         trades = new_positions - positions
 
         # Update PNL
@@ -87,9 +88,9 @@ def run_backtest(
 
         # Debug Log
         if debug_interval and (t - constants.ESTIMATION_WINDOW) % debug_interval == 0:
-            valid = ~np.isnan(s_scores)
             print(f"\n--- Day {t}: {stock_returns.index[t].date()} ---")
             print(f"Equity:        {equity:.2f}")
+            print(f"Passed OU filter: {valid.sum()}")
             print(f"Portfolio beta: {portfolio_beta:.2f}")
             print(f"SPY hedge PNL: {spy_pnl:.4f}")
             print(f"Valid stocks:  {valid.sum()}")
@@ -119,6 +120,7 @@ def run_backtest(
                 "n_long": (positions > 0).sum(),
                 "n_short": (positions < 0).sum(),
                 "daily_returns": daily_returns,
+                "n_factors": n_factors,
             }
         )
 
